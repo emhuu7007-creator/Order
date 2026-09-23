@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Management System</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; padding: 15px; max-width: 1000px; margin: 0 auto; background-color: #f4f6f8; color: #333; }
+    
+    /* Global Fullscreen Loading Overlay */
+    #global-loader {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    .inline-spinner {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #007bff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Login Screen Style */
+    #login-screen { max-width: 400px; margin: 60px auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    #app-screen { display: none; }
+
+    /* Header Bar */
+    .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .header-bar h3 { margin: 0; font-size: 18px; color: #007bff; }
+
+    /* Tabs Style */
+    .tab-container { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 15px; background: white; border-radius: 10px 10px 0 0; overflow: hidden; }
+    .tab-btn { flex: 1; padding: 12px; border: none; background: #e9ecef; cursor: pointer; font-size: 15px; font-weight: bold; color: #495057; transition: 0.3s; }
+    .tab-btn.active { background: #007bff; color: white; }
+
+    /* Content Box */
+    .tab-content { display: none; background: white; padding: 20px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .tab-content.active { display: block; }
+
+    /* Summary Cards Style */
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .summary-card { padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #ffffff; }
+    .summary-card span { font-size: 13px; font-weight: bold; opacity: 0.95; }
+    .summary-card h2 { margin: 5px 0 0 0; font-size: 24px; }
+
+    /* Form Inputs */
+    label { font-weight: bold; font-size: 14px; margin-top: 10px; display: block; }
+    input, select, textarea, button { width: 100%; padding: 12px; margin-top: 6px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    button { background-color: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    /* Action Buttons */
+    .btn-action { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-edit { background-color: #ffc107; color: black; padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: auto; margin: 0; font-size: 12px; }
+    .btn-print { background-color: #17a2b8; color: white; padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: auto; margin: 0; font-size: 12px; }
+    .btn-delete { background-color: #dc3545; color: white; padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: auto; margin: 0; font-size: 12px; }
+    .btn-cancel { background-color: #6c757d; display: none; margin-top: 5px; }
+
+    /* Filter Bar & Controls */
+    .filter-bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 15px; flex-wrap: wrap; }
+    .filter-group { flex: 1; min-width: 200px; }
+    .filter-bar input, .filter-bar select { margin: 0; }
+
+    /* Desktop Table View */
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: white; }
+    th, td { border: 1px solid #eee; padding: 10px; text-align: left; font-size: 13px; }
+    th { background-color: #f8f9fa; font-weight: bold; }
+    
+    /* Mobile Card View (When Screen <= 768px) */
+    .mobile-cards { display: none; flex-direction: column; gap: 12px; }
+    .order-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; margin-bottom: 8px; }
+    .card-title { font-size: 16px; font-weight: bold; color: #111; }
+    .card-row { margin-bottom: 6px; font-size: 14px; color: #555; }
+    .card-row strong { color: #222; }
+
+    /* Badges */
+    .badge { padding: 4px 10px; border-radius: 20px; color: white; font-size: 12px; font-weight: bold; display: inline-block; }
+    .delivered { background-color: #28a745; }
+    .pending { background-color: #ffc107; color: black; }
+
+    /* Pagination Style */
+    .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; flex-wrap: wrap; gap: 10px; }
+    .pagination-btns { display: flex; gap: 5px; }
+    .page-btn { padding: 8px 14px; border: 1px solid #007bff; background: white; color: #007bff; border-radius: 6px; cursor: pointer; width: auto; margin: 0; font-size: 13px; font-weight: bold; }
+    .page-btn.active { background: #007bff; color: white; }
+    .page-btn:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; }
+
+    @media (max-width: 768px) {
+      .table-container { display: none; }
+      .mobile-cards { display: flex; }
+      body { padding: 10px; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .pagination-container { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Fullscreen Loader Overlay -->
+  <div id="global-loader">
+    <div class="spinner"></div>
+    <div id="loader-text" style="font-size: 16px; font-weight: 500;">လုပ်ဆောင်နေပါသည်...</div>
+  </div>
+
+  <!-- 1. LOGIN SCREEN -->
+  <div id="login-screen">
+    <h2 style="text-align:center; margin-bottom: 20px; color: #007bff;">🔒 Admin Login</h2>
+    <form id="loginForm">
+      <label>Username</label>
+      <input type="text" id="loginUser" required placeholder="Username ထည့်ပါ">
+
+      <label>Password</label>
+      <input type="password" id="loginPass" required placeholder="Password ထည့်ပါ">
+
+      <button type="submit" id="loginBtn">Login ဝင်မည်</button>
+    </form>
+  </div>
+
+  <!-- 2. MAIN APP SCREEN -->
+  <div id="app-screen">
+    <div class="header-bar">
+      <h3>Order Dashboard</h3>
+      <button onclick="logout()" style="background-color: #dc3545; width: auto; margin: 0; padding: 8px 14px;">Logout</button>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tab-container">
+      <button class="tab-btn active" onclick="switchTab('add-tab')">➕ Order ထည့်ရန်</button>
+      <button class="tab-btn" onclick="switchTab('list-tab')">📋 Order စာရင်းများ</button>
+    </div>
+
+    <!-- Tab 1: Order Add/Edit -->
+    <div id="add-tab" class="tab-content active">
+      <h2 id="formTitle" style="margin-top:0;">Order အသစ်ထည့်ရန်</h2>
+      <form id="orderForm">
+        <input type="hidden" id="rowId" value="">
+        <input type="hidden" id="existingVoucherLink" value="">
+
+        <label>ရက်စွဲ (Added Date)</label>
+        <input type="date" id="orderDate" required>
+
+        <label>နာမည်</label>
+        <input type="text" id="name" required placeholder="အမည်ထည့်ပါ">
+
+        <label>ဖုန်းနံပါတ်</label>
+        <input type="tel" id="phone" required placeholder="09xxxxxxxxx">
+
+        <label>နေရပ်လိပ်စာ</label>
+        <textarea id="address" rows="3" required placeholder="မြို့နယ်/လိပ်စာ အပြည့်အစုံ"></textarea>
+
+        <label>ပို့ဆောင်မှု အခြေအနေ (Status)</label>
+        <select id="status">
+          <option value="မပို့ရသေး">မပို့ရသေး (Pending)</option>
+          <option value="ပို့ပြီး">ပို့ပြီး (Delivered)</option>
+        </select>
+
+        <label>ဘာနဲ့ ပို့ထားလဲ (Courier Service)</label>
+        <input type="text" id="courier" placeholder="ဥပမာ - Royal Express, Delivery Gate">
+
+        <label>ဘောင်ချာ ပုံ (မပြောင်းချင်ပါက ရွေးစရာမလိုပါ)</label>
+        <input type="file" id="voucherFile" accept="image/*">
+
+        <button type="submit" id="submitBtn">Order သိမ်းမည်</button>
+        <button type="button" id="cancelBtn" class="btn-cancel" onclick="resetForm()">Edit မလုပ်တော့ပါ (Cancel)</button>
+      </form>
+    </div>
+
+    <!-- Tab 2: Order List -->
+    <div id="list-tab" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+        <h2 style="margin: 0;">Order စာရင်းများ</h2>
+        <button id="refreshBtn" onclick="loadOrders()" style="background-color: #28a745; width: auto; margin: 0; padding: 8px 14px;">🔄 Refresh စာရင်းကြည့်မည်</button>
+      </div>
+
+      <!-- Summary Cards Counter Section -->
+      <div class="summary-grid">
+        <div class="summary-card" style="background-color: #007bff;">
+          <span>စုစုပေါင်း Order</span>
+          <h2 id="totalCount">0</h2>
+        </div>
+        <div class="summary-card" style="background-color: #28a745;">
+          <span>✅ ပို့ပြီး အရေအတွက်</span>
+          <h2 id="deliveredCount">0</h2>
+        </div>
+        <div class="summary-card" style="background-color: #f39c12;">
+          <span>⏳ မပို့ရသေး အရေအတွက်</span>
+          <h2 id="pendingCount">0</h2>
+        </div>
+      </div>
+
+      <!-- Search & Sorting Controls -->
+      <div class="filter-bar">
+        <div class="filter-group">
+          <input type="text" id="searchInput" placeholder="🔍 နာမည်/ဖုန်း/ရက်စွဲဖြင့် ရှာရန်..." oninput="onFilterChange()">
+        </div>
+        <div class="filter-group">
+          <select id="sortOrder" onchange="onFilterChange()">
+            <option value="desc">⬆️ အသစ်ဆုံး အပေါ်ထားမည်</option>
+            <option value="asc">⬇️ အဟောင်းဆုံး အပေါ်ထားမည်</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Desktop View (Table) -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ရက်စွဲ</th>
+              <th>နာမည်</th>
+              <th>ဖုန်း</th>
+              <th>လိပ်စာ</th>
+              <th>Status</th>
+              <th>Courier</th>
+              <th>Voucher</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="orderTableBody">
+            <tr><td colspan="8" style="text-align:center;">စာရင်းဆွဲယူနေပါသည်...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile View (Cards) -->
+      <div class="mobile-cards" id="mobileCardsContainer">
+        <div style="text-align:center; padding: 20px; color: #666;">စာရင်းဆွဲယူနေပါသည်...</div>
+      </div>
+
+      <!-- Pagination Footer -->
+      <div class="pagination-container">
+        <span id="pageInfo" style="font-size: 14px; font-weight: bold; color: #555;">Page 1 of 1 (စုစုပေါင်း 0)</span>
+        <div class="pagination-btns" id="paginationBtns"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbww5K_aj0P2WSjnZqtgfsqR1Mf7bCwQLlQBuxV8swmFRwHIvxUEdrQy6VonmKmM1_EC/exec";
+    let ordersData = [];
+    let filteredData = [];
+    let currentPage = 1;
+    const rowsPerPage = 20;
+
+    // Loading Helper Functions
+    function showLoader(text = "လုပ်ဆောင်နေပါသည်...") {
+      document.getElementById('loader-text').innerText = text;
+      document.getElementById('global-loader').style.display = 'flex';
+    }
+
+    function hideLoader() {
+      document.getElementById('global-loader').style.display = 'none';
+    }
+
+    function setTodayDate() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('orderDate').value = today;
+    }
+
+    window.onload = function() {
+      setTodayDate();
+      if (sessionStorage.getItem('isLoggedIn') === 'true') {
+        showAppScreen();
+      }
+    };
+
+    // Login Handler
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const user = document.getElementById('loginUser').value;
+      const pass = document.getElementById('loginPass').value;
+      const btn = document.getElementById('loginBtn');
+
+      btn.disabled = true;
+      showLoader("Login အချက်အလက် စစ်ဆေးနေပါသည်...");
+
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: "login", username: user, password: pass })
+      })
+      .then(res => res.json())
+      .then(res => {
+        hideLoader();
+        btn.disabled = false;
+        if (res.status === "success") {
+          sessionStorage.setItem('isLoggedIn', 'true');
+          showAppScreen();
+        } else {
+          alert("Username သို့မဟုတ် Password မှားယွင်းနေပါသည်။");
+        }
+      })
+      .catch(err => {
+        hideLoader();
+        btn.disabled = false;
+        alert("ချိတ်ဆက်မှု မအောင်မြင်ပါ။ ပြန်လည်ကြိုးစားကြည့်ပါ။");
+      });
+    });
+
+    function showAppScreen() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+      loadOrders();
+    }
+
+    function logout() {
+      sessionStorage.removeItem('isLoggedIn');
+      location.reload();
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+      document.getElementById(tabId).classList.add('active');
+      
+      if (tabId === 'add-tab') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+      } else {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        loadOrders();
+      }
+    }
+
+    // Order Submit Handler
+    document.getElementById('orderForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const rowId = document.getElementById('rowId').value;
+      const isEdit = rowId !== "";
+
+      btn.disabled = true;
+      showLoader(isEdit ? "Order အချက်အလက်များကို ပြင်ဆင်နေပါသည်..." : "Order အသစ်ကို Drive/Sheet ထဲ သိမ်းဆည်းနေပါသည်...");
+
+      const fileInput = document.getElementById('voucherFile');
+      let fileData = null, fileName = "", fileMimeType = "";
+
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        fileName = file.name;
+        fileMimeType = file.type;
+        fileData = await convertFileToBase64(file);
+      }
+
+      const payload = {
+        action: isEdit ? "update" : "create",
+        rowId: rowId,
+        date: document.getElementById('orderDate').value,
+        name: document.getElementById('name').value,
+        phone: document.getElementById('phone').value,
+        address: document.getElementById('address').value,
+        status: document.getElementById('status').value,
+        courier: document.getElementById('courier').value,
+        existingVoucherLink: document.getElementById('existingVoucherLink').value,
+        fileData: fileData,
+        fileName: fileName,
+        fileMimeType: fileMimeType
+      };
+
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        hideLoader();
+        btn.disabled = false;
+        alert(isEdit ? "Order စာရင်း ပြင်ဆင်ပြီးပါပြီ!" : "Order အသစ် သိမ်းဆည်းပြီးပါပြီ!");
+        resetForm();
+        switchTab('list-tab');
+      })
+      .catch(err => {
+        hideLoader();
+        btn.disabled = false;
+        alert("သိမ်းဆည်း၍ မရပါ။ အင်တာနက်လိုင်း စစ်ဆေးပေးပါ။");
+      });
+    });
+
+    function convertFileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    // Load Orders with Inline Table/Card Spinner
+    function loadOrders() {
+      const tbody = document.getElementById('orderTableBody');
+      const mobileContainer = document.getElementById('mobileCardsContainer');
+      const refreshBtn = document.getElementById('refreshBtn');
+
+      if (refreshBtn) refreshBtn.disabled = true;
+
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align:center; padding: 25px;">
+            <div class="inline-spinner"></div>
+            <div style="color: #666; font-weight: bold;">Google Sheets မှ စာရင်းဆွဲယူနေပါသည်...</div>
+          </td>
+        </tr>`;
+
+      mobileContainer.innerHTML = `
+        <div style="text-align:center; padding: 25px;">
+          <div class="inline-spinner"></div>
+          <div style="color: #666; font-weight: bold;">စာရင်းဆွဲယူနေပါသည်...</div>
+        </div>`;
+
+      fetch(API_URL)
+        .then(res => res.json())
+        .then(data => {
+          ordersData = data || [];
+          if (refreshBtn) refreshBtn.disabled = false;
+          onFilterChange();
+        })
+        .catch(err => {
+          if (refreshBtn) refreshBtn.disabled = false;
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color: red;">စာရင်းဆွဲယူ၍ မရပါ။ Refresh ပြန်လုပ်ကြည့်ပါ။</td></tr>';
+          mobileContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: red;">စာရင်းဆွဲယူ၍ မရပါ။</div>';
+        });
+    }
+
+    // Filter, Search & Sort
+    function onFilterChange() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      const sortOrder = document.getElementById('sortOrder').value;
+
+      filteredData = ordersData.filter(item => {
+        const nameMatch = item.name && item.name.toLowerCase().includes(searchTerm);
+        const phoneMatch = item.phone && item.phone.toString().includes(searchTerm);
+        const dateMatch = item.date && item.date.toString().includes(searchTerm);
+        return nameMatch || phoneMatch || dateMatch;
+      });
+
+      const total = filteredData.length;
+      const delivered = filteredData.filter(item => item.status === 'ပို့ပြီး').length;
+      const pending = filteredData.filter(item => item.status === 'မပို့ရသေး').length;
+
+      document.getElementById('totalCount').innerText = total;
+      document.getElementById('deliveredCount').innerText = delivered;
+      document.getElementById('pendingCount').innerText = pending;
+
+      if (sortOrder === 'desc') {
+        filteredData.reverse();
+      }
+
+      currentPage = 1;
+      renderViews();
+    }
+
+    // Render Views
+    function renderViews() {
+      const tbody = document.getElementById('orderTableBody');
+      const mobileContainer = document.getElementById('mobileCardsContainer');
+      
+      tbody.innerHTML = '';
+      mobileContainer.innerHTML = '';
+
+      if (!filteredData || filteredData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Order စာရင်းမရှိသေးပါ</td></tr>';
+        mobileContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: #888;">Order စာရင်းမရှိသေးပါ</div>';
+        document.getElementById('pageInfo').innerText = 'စုစုပေါင်း 0 ခု';
+        document.getElementById('paginationBtns').innerHTML = '';
+        return;
+      }
+
+      const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+      const startIndex = (currentPage - 1) * rowsPerPage;
+      const endIndex = startIndex + rowsPerPage;
+      const paginatedData = filteredData.slice(startIndex, endIndex);
+
+      paginatedData.forEach(item => {
+        const statusClass = item.status === 'ပို့ပြီး' ? 'delivered' : 'pending';
+        const displayDate = item.date || '-';
+        const voucher = item.voucherLink && item.voucherLink !== '-' 
+          ? `<a href="${item.voucherLink}" target="_blank" style="color:#007bff;font-weight:bold;">ကြည့်ရန်</a>` 
+          : '-';
+
+        const row = `<tr>
+          <td>${displayDate}</td>
+          <td>${item.name}</td>
+          <td>${item.phone}</td>
+          <td>${item.address}</td>
+          <td><span class="badge ${statusClass}">${item.status}</span></td>
+          <td>${item.courier}</td>
+          <td>${voucher}</td>
+          <td>
+            <div class="btn-action">
+              <button class="btn-print" onclick="printInvoice('${item.rowId}')">🖨️ Print</button>
+              <button class="btn-edit" onclick="editOrder('${item.rowId}')">Edit</button>
+              <button class="btn-delete" onclick="deleteOrder('${item.rowId}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+        tbody.innerHTML += row;
+
+        const card = `<div class="order-card">
+          <div class="card-header">
+            <span class="card-title">${item.name}</span>
+            <span class="badge ${statusClass}">${item.status}</span>
+          </div>
+          <div class="card-row"><strong>📅 ရက်စွဲ:</strong> ${displayDate}</div>
+          <div class="card-row"><strong>📞 ဖုန်း:</strong> ${item.phone}</div>
+          <div class="card-row"><strong>📍 လိပ်စာ:</strong> ${item.address}</div>
+          <div class="card-row"><strong>🚚 Courier:</strong> ${item.courier}</div>
+          <div class="card-row"><strong>🧾 Voucher:</strong> ${voucher}</div>
+          <div style="margin-top: 10px;" class="btn-action">
+            <button class="btn-print" style="flex:1;" onclick="printInvoice('${item.rowId}')">🖨️ Print</button>
+            <button class="btn-edit" style="flex:1;" onclick="editOrder('${item.rowId}')">✏️ Edit</button>
+            <button class="btn-delete" style="flex:1;" onclick="deleteOrder('${item.rowId}')">🗑️ Delete</button>
+          </div>
+        </div>`;
+        mobileContainer.innerHTML += card;
+      });
+
+      renderPaginationControls(totalPages);
+    }
+
+    function renderPaginationControls(totalPages) {
+      document.getElementById('pageInfo').innerText = `Page ${currentPage} of ${totalPages} (စုစုပေါင်း ${filteredData.length} ခု)`;
+      const container = document.getElementById('paginationBtns');
+      container.innerHTML = '';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'page-btn';
+      prevBtn.innerText = '« Prev';
+      prevBtn.disabled = currentPage === 1;
+      prevBtn.onclick = () => { currentPage--; renderViews(); window.scrollTo(0,0); };
+      container.appendChild(prevBtn);
+
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+          const pageBtn = document.createElement('button');
+          pageBtn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+          pageBtn.innerText = i;
+          pageBtn.onclick = () => { currentPage = i; renderViews(); window.scrollTo(0,0); };
+          container.appendChild(pageBtn);
+        }
+      }
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'page-btn';
+      nextBtn.innerText = 'Next »';
+      nextBtn.disabled = currentPage === totalPages;
+      nextBtn.onclick = () => { currentPage++; renderViews(); window.scrollTo(0,0); };
+      container.appendChild(nextBtn);
+    }
+
+    function editOrder(rowId) {
+      const order = ordersData.find(o => String(o.rowId) === String(rowId));
+      if (!order) {
+        alert("Order အချက်အလက် ရှာမတွေ့ပါ။ Refresh ပြန်လုပ်ကြည့်ပါ။");
+        return;
+      }
+
+      document.getElementById('rowId').value = order.rowId;
+      document.getElementById('orderDate').value = order.date || new Date().toISOString().split('T')[0];
+      document.getElementById('name').value = order.name;
+      document.getElementById('phone').value = order.phone;
+      document.getElementById('address').value = order.address;
+      document.getElementById('status').value = order.status;
+      document.getElementById('courier').value = order.courier === '-' ? '' : order.courier;
+      document.getElementById('existingVoucherLink').value = order.voucherLink;
+
+      document.getElementById('formTitle').innerText = "Order စာရင်း ပြင်ဆင်ရန် (Row: " + order.rowId + ")";
+      document.getElementById('submitBtn').innerText = "Update လုပ်မည်";
+      document.getElementById('cancelBtn').style.display = "block";
+
+      switchTab('add-tab');
+      window.scrollTo(0,0);
+    }
+
+    function printInvoice(rowId) {
+      const order = ordersData.find(o => String(o.rowId) === String(rowId));
+      if (!order) {
+        alert("Invoice ထုတ်ရန် Order ရှာမတွေ့ပါ။");
+        return;
+      }
+
+      const printWindow = window.open('', '_blank', 'width=600,height=700');
+      const invoiceHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Invoice - Order #${order.rowId}</title>
+          <style>
+            body { font-family: system-ui, sans-serif; padding: 20px; line-height: 1.5; color: #222; }
+            .invoice-box { border: 2px solid #333; padding: 25px; border-radius: 8px; max-width: 500px; margin: auto; }
+            .header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 10px; margin-bottom: 15px; }
+            .header h2 { margin: 0; color: #007bff; }
+            .info-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            .info-table td { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+            .info-table td:first-child { font-weight: bold; width: 35%; color: #555; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #777; border-top: 1px solid #eee; padding-top: 10px; }
+            @media print { .print-btn { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-box">
+            <div class="header">
+              <h2>ORDER INVOICE</h2>
+              <p style="margin: 3px 0; font-size: 13px;">Order ID: #${order.rowId}</p>
+            </div>
+            <table class="info-table">
+              <tr><td>ရက်စွဲ (Date):</td><td>${order.date || '-'}</td></tr>
+              <tr><td>ဝယ်သူအမည်:</td><td>${order.name}</td></tr>
+              <tr><td>ဖုန်းနံပါတ်:</td><td>${order.phone}</td></tr>
+              <tr><td>နေရပ်လိပ်စာ:</td><td>${order.address}</td></tr>
+              <tr><td>Courier Service:</td><td>${order.courier || '-'}</td></tr>
+              <tr><td>အခြေအနေ (Status):</td><td><strong>${order.status}</strong></td></tr>
+            </table>
+            <div class="footer"><p>အားပေးမှုကို အထူးကျေးဇူးတင်ရှိပါသည်။</p></div>
+            <button class="print-btn" onclick="window.print()" style="width:100%; padding:10px; background:#007bff; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer; margin-top:20px;">🖨️ Print / Save as PDF</button>
+          </div>
+        </body>
+        </html>
+      `;
+      printWindow.document.write(invoiceHTML);
+      printWindow.document.close();
+    }
+
+    function deleteOrder(rowId) {
+      if (!confirm("ဤ Order ကို စာရင်းထဲမှ အပြီးတိုင် ဖျက်မှာ သေချာပါသလား?")) return;
+
+      showLoader("စာရင်းမှ ဖျက်ထုတ်နေပါသည်...");
+
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: "delete", rowId: rowId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        hideLoader();
+        alert("Order ဖျက်ပြီးပါပြီ!");
+        loadOrders();
+      })
+      .catch(err => {
+        hideLoader();
+        alert("ဖျက်၍ မရပါ။ အမှားအယွင်းရှိနေပါသည်။");
+      });
+    }
+
+    function resetForm() {
+      document.getElementById('orderForm').reset();
+      setTodayDate();
+      document.getElementById('rowId').value = "";
+      document.getElementById('existingVoucherLink').value = "";
+      document.getElementById('formTitle').innerText = "Order အသစ်ထည့်ရန်";
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('submitBtn').innerText = "Order သိမ်းမည်";
+      document.getElementById('cancelBtn').style.display = "none";
+    }
+  </script>
+</body>
+</html>
